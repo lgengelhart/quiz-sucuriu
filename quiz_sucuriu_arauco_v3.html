@@ -1,0 +1,252 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;}
+#app{max-width:860px;margin:0 auto;}
+.s-header{background:#F47920;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;border-radius:12px 12px 0 0;}
+.s-logo{width:36px;height:36px;background:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#F47920;flex-shrink:0;}
+.s-title{font-size:17px;font-weight:600;}
+.s-sub{font-size:12px;opacity:0.88;}
+.s-body{background:#fff;border:1px solid #e0d8d0;border-top:none;border-radius:0 0 12px 12px;padding:20px;}
+.screen{display:none;}
+.screen.active{display:block;}
+.btn{border:1px solid #F47920;border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;background:transparent;color:#F47920;font-family:inherit;}
+.btn:hover{background:#F47920;color:#fff;}
+.btn-solid{background:#F47920;color:#fff;}
+.btn-solid:hover{background:#d4661a;}
+.btn-lg{padding:13px 28px;font-size:16px;font-weight:600;}
+.wheel-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;padding:8px 0;}
+canvas{border-radius:50%;max-width:400px;width:100%;}
+.result-card{border:2px solid #F47920;border-radius:10px;padding:20px;margin-top:16px;background:#fff8f3;}
+.type-badge{font-size:11px;background:#F47920;color:#fff;border-radius:6px;padding:3px 10px;display:inline-block;margin-bottom:10px;font-weight:600;letter-spacing:0.5px;}
+.res-q{font-size:19px;font-weight:600;color:#2a1a0a;line-height:1.4;margin-bottom:14px;}
+.opt-btn{width:100%;border:1px solid #ddd;border-radius:8px;padding:10px 14px;font-size:15px;text-align:left;cursor:pointer;background:#fff;color:#2a1a0a;font-family:inherit;margin-bottom:6px;display:block;transition:all 0.12s;}
+.opt-btn:hover{border-color:#F47920;background:#fff3ec;}
+.opt-btn.correct{background:#f0f9e8;border-color:#8FAF2A;color:#4a6010;font-weight:600;}
+.opt-btn.wrong{background:#fdecea;border-color:#c0392b;color:#7a1a14;}
+.opt-btn:disabled{cursor:default;}
+.ans-box{background:#f0f9e8;border:1px solid #8FAF2A;border-radius:8px;padding:12px 16px;color:#4a6010;font-size:15px;font-weight:600;margin-top:10px;}
+.special-card{background:#fff8e1;border:2px solid #E8A731;border-radius:10px;padding:28px;text-align:center;margin-top:16px;}
+.special-title{font-size:26px;font-weight:700;color:#7a5200;margin-bottom:8px;}
+.special-sub{font-size:15px;color:#6a4800;}
+.q-row{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #f0e8e0;align-items:flex-start;}
+.q-num{font-size:12px;color:#aaa;min-width:20px;}
+.q-ans{font-size:11px;background:#f0f9e8;color:#4a6010;border-radius:4px;padding:2px 6px;margin-top:2px;display:inline-block;}
+.q-type{font-size:11px;background:#fff3ec;color:#c05a10;border-radius:4px;padding:2px 6px;margin-top:2px;display:inline-block;margin-left:3px;}
+.counter{font-size:12px;color:#888;margin-top:10px;text-align:center;}
+</style>
+
+<div id="app">
+  <div class="s-header">
+    <div class="s-logo">S</div>
+    <div>
+      <div class="s-title">Quiz Projeto Sucuriú</div>
+      <div class="s-sub">Arauco — Formação de Motoristas</div>
+    </div>
+  </div>
+  <div class="s-body">
+
+    <div id="screen-setup" class="screen active">
+      <div style="margin-bottom:14px;">
+        <button class="btn btn-solid btn-lg" onclick="startWheel()">Iniciar roleta</button>
+      </div>
+      <div id="q-list"></div>
+    </div>
+
+    <div id="screen-wheel" class="screen">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-size:16px;font-weight:600;color:#2a1a0a;">Roleta Sucuriú</div>
+        <button class="btn" style="font-size:12px;padding:6px 12px;" onclick="goSetup()">← Editar</button>
+      </div>
+      <div class="wheel-wrap">
+        <div style="font-size:26px;color:#F47920;">▼</div>
+        <canvas id="wc" width="400" height="400"></canvas>
+        <button id="spin-btn" class="btn btn-solid btn-lg" onclick="spin()">Girar!</button>
+      </div>
+      <div id="result-area"></div>
+      <div class="counter" id="counter"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+var questions = [];
+var spinning = false;
+var angle = 0;
+var usedPerType = {};
+
+var SEGS = [
+  {label:'Pergunta\nFácil',   color:'#F47920', type:'facil'},
+  {label:'V ou F',            color:'#5B9E8A', type:'vf'},
+  {label:'Complete\na Frase', color:'#E8A731', type:'complete'},
+  {label:'Ganhou\nBrinde!',   color:'#8FAF2A', type:'brinde'},
+  {label:'Pergunta\nFácil',   color:'#F47920', type:'facil'},
+  {label:'Tente\nOutra Vez',  color:'#AF6D59', type:'tente'},
+  {label:'Surpresa',          color:'#5B9E8A', type:'surpresa'},
+  {label:'Pergunta\nFácil',   color:'#F47920', type:'facil'},
+];
+
+var TLABELS = {facil:'Pergunta Fácil',vf:'Verdadeiro ou Falso',complete:'Complete a Frase',surpresa:'Surpresa'};
+
+function init() {
+  questions = [
+    {type:'facil', q:'Qual categoria da CNH o curso da Arauco ajuda a conquistar?', a:'Categoria D', opts:['Categoria A','Categoria B','Categoria D','Categoria E']},
+    {type:'facil', q:'O curso oferecido pela Arauco é:', a:'100% gratuito', opts:['Pago','Parcialmente gratuito','100% gratuito']},
+    {type:'facil', q:'Quantas oportunidades estão sendo oferecidas?', a:'200', opts:['50','100','200','500']},
+    {type:'facil', q:'Qual EPI protege os olhos?', a:'Óculos de segurança', opts:['Luva','Capacete','Óculos de segurança','Botina']},
+    {type:'facil', q:'Qual EPI protege a audição?', a:'Protetor auricular', opts:['Protetor auricular','Óculos','Perneira','Luvas']},
+    {type:'facil', q:'Para participar é necessário ter:', a:'CNH B ou C', opts:['CNH A','CNH B ou C','CNH E','Não precisa CNH']},
+    {type:'facil', q:'O programa é para formação de:', a:'Motoristas', opts:['Mecânicos','Soldadores','Motoristas','Pintores']},
+    {type:'facil', q:'Qual a idade mínima para participar?', a:'21 anos', opts:['18 anos','19 anos','21 anos','25 anos']},
+    {type:'facil', q:'Em qual estado a CNH deve ser registrada?', a:'MS — Mato Grosso do Sul', opts:['SP','GO','MS','PR']},
+    {type:'facil', q:'O que acontece ao finalizar o curso?', a:'Recebe remuneração', opts:['Ganha bicicleta','Recebe remuneração','Ganha capacete','Faz outra prova']},
+    {type:'vf', q:'"O uso de EPI é obrigatório em áreas operacionais."', a:'VERDADEIRO', opts:['Verdadeiro','Falso']},
+    {type:'vf', q:'"Posso dirigir caminhão sem treinamento específico."', a:'FALSO', opts:['Verdadeiro','Falso']},
+    {type:'vf', q:'"Óculos de segurança protegem os olhos."', a:'VERDADEIRO', opts:['Verdadeiro','Falso']},
+    {type:'vf', q:'"A Arauco está oferecendo qualificação gratuita."', a:'VERDADEIRO', opts:['Verdadeiro','Falso']},
+    {type:'complete', q:'O EPI que protege a cabeça é o _______.', a:'Capacete', opts:[]},
+    {type:'complete', q:'O EPI usado nos pés é a _______.', a:'Botina', opts:[]},
+    {type:'complete', q:'A categoria da CNH oferecida pelo programa é a letra _____.', a:'D', opts:[]},
+    {type:'surpresa', q:'Cite 2 EPIs usados por um motorista de caminhão.', a:'Capacete, botina, óculos, protetor auricular ou luva', opts:[]},
+    {type:'surpresa', q:'O Projeto Sucuriú fica em qual cidade do MS?', a:'Inocência (MS)', opts:[]},
+  ];
+  usedPerType = {facil:[],vf:[],complete:[],surpresa:[]};
+  renderList();
+}
+
+function getNextQ(type) {
+  if (!usedPerType[type]) usedPerType[type] = [];
+  var pool = questions.map(function(q,i){return{q:q,i:i};}).filter(function(x){return x.q.type===type;});
+  if (!pool.length) return null;
+  var unused = pool.filter(function(x){return usedPerType[type].indexOf(x.i)===-1;});
+  if (!unused.length) { usedPerType[type]=[]; unused=pool; }
+  var pick = unused[Math.floor(Math.random()*unused.length)];
+  usedPerType[type].push(pick.i);
+  return pick.q;
+}
+
+function renderList() {
+  var el = document.getElementById('q-list');
+  var html = '';
+  for (var i=0;i<questions.length;i++) {
+    var q=questions[i];
+    html+='<div class="q-row"><span class="q-num">'+(i+1)+'.</span><div style="flex:1;font-size:13px;color:#2a1a0a;">'+q.q+'<br><span class="q-ans">'+q.a+'</span><span class="q-type">'+(TLABELS[q.type]||q.type)+'</span></div></div>';
+  }
+  el.innerHTML=html||'<p style="color:#aaa;font-size:13px;">Sem perguntas.</p>';
+}
+
+function startWheel() {
+  document.getElementById('screen-setup').classList.remove('active');
+  document.getElementById('screen-wheel').classList.add('active');
+  drawWheel();
+  document.getElementById('counter').textContent='';
+}
+
+function goSetup() {
+  document.getElementById('screen-wheel').classList.remove('active');
+  document.getElementById('screen-setup').classList.add('active');
+}
+
+function drawWheel() {
+  var canvas=document.getElementById('wc');
+  if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  var W=canvas.width,H=canvas.height,cx=W/2,cy=H/2,r=W/2-8;
+  ctx.clearRect(0,0,W,H);
+  var n=SEGS.length,slice=(2*Math.PI)/n;
+  for(var i=0;i<n;i++){
+    var seg=SEGS[i],start=angle+i*slice,end=start+slice;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,start,end);ctx.closePath();
+    ctx.fillStyle=seg.color;ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(start+slice/2);
+    var lines=seg.label.split('\n');
+    ctx.textAlign='right';ctx.fillStyle='#fff';ctx.font='600 12px sans-serif';
+    for(var j=0;j<lines.length;j++) ctx.fillText(lines[j],r-12,(j-(lines.length-1)/2)*16+4);
+    ctx.restore();
+  }
+  ctx.beginPath();ctx.arc(cx,cy,30,0,2*Math.PI);
+  ctx.fillStyle='#fff';ctx.fill();
+  ctx.strokeStyle='#F47920';ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle='#F47920';ctx.font='700 10px sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('SUCURIÚ',cx,cy);
+}
+
+function spin() {
+  if(spinning)return;
+  spinning=true;
+  document.getElementById('spin-btn').disabled=true;
+  document.getElementById('result-area').innerHTML='';
+  document.getElementById('counter').textContent='';
+  var extra=6+Math.random()*8,total=extra*2*Math.PI,dur=4000,t0=performance.now(),a0=angle;
+  function frame(now){
+    var el=now-t0,t=Math.min(el/dur,1),ease=1-Math.pow(1-t,4);
+    angle=a0+total*ease;drawWheel();
+    if(t<1){requestAnimationFrame(frame);return;}
+    angle=angle%(2*Math.PI);spinning=false;
+    document.getElementById('spin-btn').disabled=false;
+    showResult();
+  }
+  requestAnimationFrame(frame);
+}
+
+function showResult() {
+  var n=SEGS.length,slice=(2*Math.PI)/n;
+  var pointer=(2*Math.PI-angle%(2*Math.PI))%(2*Math.PI);
+  var seg=SEGS[Math.floor(pointer/slice)%n];
+
+  if(seg.type==='brinde'){
+    document.getElementById('result-area').innerHTML='<div class="special-card"><div class="special-title">Ganhou Brinde!</div><div class="special-sub">Parabéns! Você ganhou um brinde do Projeto Sucuriú!</div><br><button class="btn btn-solid" style="margin-top:10px;" onclick="clearResult()">Próxima rodada</button></div>';
+    return;
+  }
+  if(seg.type==='tente'){
+    document.getElementById('result-area').innerHTML='<div class="special-card" style="border-color:#AF6D59;"><div class="special-title" style="color:#6a3020;">Tente Outra Vez!</div><div class="special-sub" style="color:#5a2818;">Não foi dessa vez — gire novamente!</div><br><button class="btn btn-solid" style="margin-top:10px;" onclick="clearResult()">Girar de novo</button></div>';
+    return;
+  }
+
+  var item=getNextQ(seg.type);
+  if(!item){
+    document.getElementById('result-area').innerHTML='<div class="result-card"><div class="res-q">Todas as perguntas desse tipo já foram usadas! Reiniciando...</div></div>';
+    return;
+  }
+
+  var html='<div class="result-card"><div class="type-badge">'+(TLABELS[item.type]||item.type)+'</div><div class="res-q">'+item.q+'</div>';
+
+  if(item.opts&&item.opts.length){
+    for(var k=0;k<item.opts.length;k++){
+      html+='<button class="opt-btn" onclick="selectOpt(this,\''+esc(item.opts[k])+'\',\''+esc(item.a)+'\')">'+item.opts[k]+'</button>';
+    }
+    html+='<div class="ans-box" id="ans-box" style="display:none;">Resposta correta: '+item.a+'</div>';
+  } else {
+    html+='<button class="btn btn-solid" id="rev-btn" onclick="revealAns()">Revelar resposta</button>';
+    html+='<div class="ans-box" id="ans-box" style="display:none;">Resposta: '+item.a+'</div>';
+  }
+  html+='<div style="margin-top:16px;"><button class="btn btn-solid" onclick="clearResult()">Próxima rodada</button></div>';
+  html+='</div>';
+  document.getElementById('result-area').innerHTML=html;
+}
+
+function esc(s){return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+
+function selectOpt(btn,opt,correct){
+  var btns=document.querySelectorAll('.opt-btn');
+  for(var i=0;i<btns.length;i++){
+    btns[i].disabled=true;
+    if(btns[i].textContent===correct)btns[i].classList.add('correct');
+    else if(btns[i]===btn&&opt!==correct)btns[i].classList.add('wrong');
+  }
+  document.getElementById('ans-box').style.display='block';
+}
+
+function revealAns(){
+  document.getElementById('ans-box').style.display='block';
+  var rb=document.getElementById('rev-btn');
+  if(rb)rb.style.display='none';
+}
+
+function clearResult(){document.getElementById('result-area').innerHTML='';}
+
+init();
+</script>
